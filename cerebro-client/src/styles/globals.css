@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply text-text-main bg-bg-main antialiased;
+    font-family: 'Inter', 'Montserrat', 'Segoe UI', sans-serif;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(50, 173, 230, 0.16), transparent 28%),
+      radial-gradient(circle at 88% 4%, rgba(88, 86, 214, 0.14), transparent 32%),
+      radial-gradient(circle at 60% 92%, rgba(0, 122, 255, 0.12), transparent 35%),
+      theme(colors.bg-main);
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-primary ring-offset-2;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px -10px rgba(0, 50, 100, 0.1);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    border: 1px solid rgba(0, 122, 255, 0.18);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px -10px rgba(0, 50, 100, 0.1);
+  }
+
+  .glass-sidebar {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    -webkit-backdrop-filter: blur(16px) saturate(200%) brightness(1.1);
+    border-right: 1px solid rgba(0, 122, 255, 0.16);
+    box-shadow: 0 10px 40px -10px rgba(0, 50, 100, 0.1);
+  }
+
+  .ai-badge {
+    @apply inline-flex items-center rounded-full border border-ai-glow/50 bg-ai-glow/20 px-2 py-0.5 text-xs font-semibold text-brand-blue;
+  }
+
+  .page-enter {
+    @apply animate-fade-in;
+  }
+}

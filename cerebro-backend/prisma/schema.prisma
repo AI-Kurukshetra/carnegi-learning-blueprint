@@ -1,0 +1,918 @@
+// ============================================================
+// schema.prisma — AI-Adaptive School Management SaaS
+// Incorporates all fixes from plan_review.md (DB-1 through DB-7)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum BloomLevel {
+  REMEMBER
+  UNDERSTAND
+  APPLY
+  ANALYZE
+  EVALUATE
+  CREATE
+}
+
+enum QuestionType {
+  MCQ
+  MULTI_SELECT
+  SHORT_ANSWER
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AssessmentType {
+  QUIZ
+  EXAM
+  PRACTICE
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TelemetryEventType {
+  ASSESSMENT_STARTED
+  QUESTION_VIEWED
+  OPTION_SELECTED
+  HINT_REQUESTED
+  ASSESSMENT_SUBMITTED
+  SESSION_STARTED
+  SESSION_ENDED
+}
+
+enum AssessmentMode {
+  FIXED
+  ADAPTIVE
+  SEMI_ADAPTIVE
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+// ============================================================
+// GLOBAL TABLES (no tenant_id, no RLS)
+// ============================================================
+
+model Tenant {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String    @unique
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relations
+  users                    User[]
+  school_profiles          SchoolProfile[]
+  academic_years           AcademicYear[]
+  grades                   Grade[]
+  sections                 Section[]
+  classrooms               Classroom[]
+  student_enrollments      StudentEnrollment[]
+  teacher_subject_assignments TeacherSubjectAssignment[]
+  subjects                 Subject[]
+  topics                   Topic[]
+  learning_objectives      LearningObjective[]
+  lo_prerequisites         LoPrerequisite[]
+  competency_standards     CompetencyStandard[]
+  lo_competency_mappings   LoCompetencyMapping[]
+  questions                Question[]
+  question_options         QuestionOption[]
+  assessments              Assessment[]
+  assessment_questions     AssessmentQuestion[]
+  assessment_attempts      AssessmentAttempt[]
+  attempt_responses        AttemptResponse[]
+  attempt_response_selections AttemptResponseSelection[]
+  telemetry_events         TelemetryEvent[]
+  knowledge_states         KnowledgeState[]
+  hint_requests            HintRequest[]
+  refresh_tokens           RefreshToken[]
+  ai_usage_logs            AiUsageLog[]
+  question_generation_jobs QuestionGenerationJob[]
+  student_milestones       StudentMilestone[]
+  milestone_tasks          MilestoneTask[]
+  invoices                 Invoice[]
+  student_insight_cache    StudentInsightCache[]
+
+  @@map("tenants")
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+// DB-7 FIX: Proper refresh token table (replaces storing in user)
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenant_id   String    @db.Uuid
+  user_id     String    @db.Uuid
+  token_hash  String    @unique
+  is_revoked  Boolean   @default(false)
+  expires_at  DateTime  @db.Timestamptz
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  revoked_at  DateTime? @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+  user   User   @relation(fields: [user_id], references: [id])
+
+  @@index([tenant_id], name: "idx_refresh_tokens_tenant_id")
+  @@index([user_id], name: "idx_refresh_tokens_user_id")
+  @@index([token_hash], name: "idx_refresh_tokens_token_hash")
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// TENANT-SCOPED TABLES
+// ============================================================
+
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenant_id     String    @db.Uuid
+  email         String
+  password_hash String
+  role          Role
+  first_name    String
+  last_name     String
+  is_active     Boolean   @default(true)
+  is_verified   Boolean   @default(false)
+  last_login_at DateTime? @db.Timestamptz
+  created_at    DateTime  @default(now()) @db.Timestamptz
+  updated_at    DateTime  @updatedAt @db.Timestamptz
+  deleted_at    DateTime? @db.Timestamptz
+
+  // Relations
+  tenant                      Tenant                     @relation(fields: [tenant_id], references: [id])
+  classrooms_taught           Classroom[]                @relation("TeacherClassrooms")
+  created_questions           Question[]                 @relation("QuestionCreator")
+  created_assessments         Assessment[]               @relation("AssessmentCreator")
+  enrollments                 StudentEnrollment[]        @relation("StudentEnrollments")
+  assessment_attempts         AssessmentAttempt[]        @relation("StudentAttempts")
+  reviewed_responses          AttemptResponse[]          @relation("ResponseReviewer")
+  telemetry_events            TelemetryEvent[]
+  knowledge_states            KnowledgeState[]
+  hint_requests               HintRequest[]
+  refresh_tokens              RefreshToken[]
+  teacher_subject_assignments TeacherSubjectAssignment[]
+  ai_usage_logs               AiUsageLog[]
+  question_generation_jobs    QuestionGenerationJob[]
+  student_milestones          StudentMilestone[]        @relation("StudentMilestones")
+  created_milestones          StudentMilestone[]        @relation("MilestoneCreator")
+  milestone_tasks_created     MilestoneTask[]           @relation("TaskCreator")
+  milestone_tasks_reviewed    MilestoneTask[]           @relation("TaskReviewer")
+  insight_as_student          StudentInsightCache[]     @relation("InsightStudent")
+  insight_generated           StudentInsightCache[]     @relation("InsightGenerator")
+
+  @@unique([tenant_id, email], name: "uq_users_tenant_email")
+  @@index([tenant_id], name: "idx_users_tenant_id")
+  @@index([tenant_id, role], name: "idx_users_tenant_role")
+  @@index([tenant_id, is_active], name: "idx_users_tenant_is_active")
+  @@map("users")
+}
+
+model SchoolProfile {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenant_id  String   @unique @db.Uuid
+  address    String?
+  phone      String?
+  logo_url   String?
+  timezone   String   @default("UTC")
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@index([tenant_id], name: "idx_school_profiles_tenant_id")
+  @@map("school_profiles")
+}
+
+model AcademicYear {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenant_id  String    @db.Uuid
+  name       String
+  start_date DateTime  @db.Date
+  end_date   DateTime  @db.Date
+  is_active  Boolean   @default(false)
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relations
+  tenant              Tenant              @relation(fields: [tenant_id], references: [id])
+  grades              Grade[]
+  classrooms          Classroom[]
+  student_enrollments StudentEnrollment[]
+
+  @@index([tenant_id], name: "idx_academic_years_tenant_id")
+  @@index([tenant_id, is_active], name: "idx_academic_years_tenant_is_active")
+  // REQUIRED FIX: Partial unique index ensuring only one active academic year per tenant
+  // Note: Prisma doesn't support partial indexes natively; applied via migration SQL
+  @@map("academic_years")
+}
+
+model Grade {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenant_id        String    @db.Uuid
+  academic_year_id String    @db.Uuid
+  name             String
+  level_number     Int
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+
+  // Relations
+  tenant        Tenant       @relation(fields: [tenant_id], references: [id])
+  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+  sections      Section[]
+
+  @@index([tenant_id], name: "idx_grades_tenant_id")
+  @@index([tenant_id, academic_year_id], name: "idx_grades_tenant_academic_year")
+  @@index([tenant_id, level_number], name: "idx_grades_tenant_level_number")
+  @@map("grades")
+}
+
+model Section {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenant_id  String    @db.Uuid
+  grade_id   String    @db.Uuid
+  name       String
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+  deleted_at DateTime? @db.Timestamptz
+
+  // Relations
+  tenant              Tenant              @relation(fields: [tenant_id], references: [id])
+  grade               Grade               @relation(fields: [grade_id], references: [id])
+  classrooms          Classroom[]
+  student_enrollments StudentEnrollment[]
+
+  @@index([tenant_id], name: "idx_sections_tenant_id")
+  @@index([tenant_id, grade_id], name: "idx_sections_tenant_grade")
+  @@map("sections")
+}
+
+model Classroom {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenant_id        String    @db.Uuid
+  section_id       String    @db.Uuid
+  subject_id       String    @db.Uuid
+  teacher_id       String    @db.Uuid
+  academic_year_id String    @db.Uuid
+  name             String
+  is_active        Boolean   @default(true)
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+  deleted_at       DateTime? @db.Timestamptz
+
+  // Relations
+  tenant        Tenant       @relation(fields: [tenant_id], references: [id])
+  section       Section      @relation(fields: [section_id], references: [id])
+  subject       Subject      @relation(fields: [subject_id], references: [id])
+  teacher       User         @relation("TeacherClassrooms", fields: [teacher_id], references: [id])
+  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+  assessments           Assessment[]
+  student_milestones    StudentMilestone[]
+  student_insight_cache StudentInsightCache[]
+
+  @@index([tenant_id], name: "idx_classrooms_tenant_id")
+  @@index([tenant_id, teacher_id], name: "idx_classrooms_tenant_teacher")
+  @@index([tenant_id, section_id], name: "idx_classrooms_tenant_section")
+  @@index([tenant_id, academic_year_id], name: "idx_classrooms_tenant_academic_year")
+  @@index([tenant_id, subject_id], name: "idx_classrooms_tenant_subject")
+  @@map("classrooms")
+}
+
+model StudentEnrollment {
+  id               String    @id @default(uuid()) @db.Uuid
+  tenant_id        String    @db.Uuid
+  student_id       String    @db.Uuid
+  section_id       String    @db.Uuid
+  academic_year_id String    @db.Uuid
+  is_active        Boolean   @default(true)
+  enrolled_at      DateTime  @default(now()) @db.Timestamptz
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant        Tenant       @relation(fields: [tenant_id], references: [id])
+  student       User         @relation("StudentEnrollments", fields: [student_id], references: [id])
+  section       Section      @relation(fields: [section_id], references: [id])
+  academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
+
+  @@unique([tenant_id, student_id, section_id, academic_year_id], name: "uq_enrollments_tenant_student_section_year")
+  @@index([tenant_id], name: "idx_enrollments_tenant_id")
+  @@index([tenant_id, student_id], name: "idx_enrollments_tenant_student")
+  @@index([tenant_id, section_id], name: "idx_enrollments_tenant_section")
+  @@index([tenant_id, academic_year_id], name: "idx_enrollments_tenant_academic_year")
+  @@map("student_enrollments")
+}
+
+// DB-2 FIX: Junction table replaces teacher_profiles.subject_ids String[]
+model TeacherSubjectAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenant_id  String   @db.Uuid
+  teacher_id String   @db.Uuid
+  subject_id String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenant_id], references: [id])
+  teacher User    @relation(fields: [teacher_id], references: [id])
+  subject Subject @relation(fields: [subject_id], references: [id])
+
+  @@unique([tenant_id, teacher_id, subject_id], name: "uq_teacher_subject_tenant")
+  @@index([tenant_id, teacher_id], name: "idx_teacher_subject_tenant_teacher")
+  @@index([tenant_id, subject_id], name: "idx_teacher_subject_tenant_subject")
+  @@map("teacher_subject_assignments")
+}
+
+model Subject {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenant_id   String    @db.Uuid
+  name        String
+  code        String
+  description String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+
+  // Relations
+  tenant                      Tenant                     @relation(fields: [tenant_id], references: [id])
+  topics                      Topic[]
+  classrooms                  Classroom[]
+  teacher_subject_assignments TeacherSubjectAssignment[]
+
+  @@unique([tenant_id, code], name: "uq_subjects_tenant_code")
+  @@index([tenant_id], name: "idx_subjects_tenant_id")
+  @@index([tenant_id, is_active], name: "idx_subjects_tenant_is_active")
+  @@map("subjects")
+}
+
+model Topic {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenant_id   String    @db.Uuid
+  subject_id  String    @db.Uuid
+  name        String
+  description String?
+  order_index Int
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+
+  // Relations
+  tenant              Tenant              @relation(fields: [tenant_id], references: [id])
+  subject             Subject             @relation(fields: [subject_id], references: [id])
+  learning_objectives LearningObjective[]
+
+  @@index([tenant_id], name: "idx_topics_tenant_id")
+  @@index([tenant_id, subject_id], name: "idx_topics_tenant_subject")
+  @@index([tenant_id, subject_id, order_index], name: "idx_topics_tenant_subject_order")
+  @@map("topics")
+}
+
+model LearningObjective {
+  id          String     @id @default(uuid()) @db.Uuid
+  tenant_id   String     @db.Uuid
+  topic_id    String     @db.Uuid
+  title       String
+  description String?
+  bloom_level BloomLevel
+  order_index Int
+  created_at  DateTime   @default(now()) @db.Timestamptz
+  updated_at  DateTime   @updatedAt @db.Timestamptz
+  deleted_at  DateTime?  @db.Timestamptz
+
+  // Relations
+  tenant                   Tenant                  @relation(fields: [tenant_id], references: [id])
+  topic                    Topic                   @relation(fields: [topic_id], references: [id])
+  prerequisite_sources     LoPrerequisite[]        @relation("SourceLO")
+  prerequisite_targets     LoPrerequisite[]        @relation("TargetLO")
+  lo_competency_mappings   LoCompetencyMapping[]
+  questions                Question[]
+  knowledge_states         KnowledgeState[]
+  question_generation_jobs QuestionGenerationJob[]
+
+  @@index([tenant_id], name: "idx_los_tenant_id")
+  @@index([tenant_id, topic_id], name: "idx_los_tenant_topic")
+  @@index([tenant_id, bloom_level], name: "idx_los_tenant_bloom_level")
+  @@map("learning_objectives")
+}
+
+model LoPrerequisite {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenant_id    String   @db.Uuid
+  source_lo_id String   @db.Uuid
+  target_lo_id String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant    Tenant            @relation(fields: [tenant_id], references: [id])
+  source_lo LearningObjective @relation("SourceLO", fields: [source_lo_id], references: [id])
+  target_lo LearningObjective @relation("TargetLO", fields: [target_lo_id], references: [id])
+
+  @@unique([tenant_id, source_lo_id, target_lo_id], name: "uq_lo_prerequisites_tenant_source_target")
+  @@index([tenant_id], name: "idx_lo_prerequisites_tenant_id")
+  @@index([tenant_id, source_lo_id], name: "idx_lo_prerequisites_tenant_source")
+  @@index([tenant_id, target_lo_id], name: "idx_lo_prerequisites_tenant_target")
+  @@map("lo_prerequisites")
+}
+
+model CompetencyStandard {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenant_id   String    @db.Uuid
+  code        String
+  title       String
+  description String?
+  created_at  DateTime  @default(now()) @db.Timestamptz
+  updated_at  DateTime  @updatedAt @db.Timestamptz
+  deleted_at  DateTime? @db.Timestamptz
+
+  // Relations
+  tenant                 Tenant                @relation(fields: [tenant_id], references: [id])
+  lo_competency_mappings LoCompetencyMapping[]
+
+  @@unique([tenant_id, code], name: "uq_competency_standards_tenant_code")
+  @@index([tenant_id], name: "idx_competency_standards_tenant_id")
+  @@map("competency_standards")
+}
+
+model LoCompetencyMapping {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenant_id              String   @db.Uuid
+  learning_objective_id  String   @db.Uuid
+  competency_standard_id String   @db.Uuid
+  created_at             DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant              Tenant             @relation(fields: [tenant_id], references: [id])
+  learning_objective  LearningObjective  @relation(fields: [learning_objective_id], references: [id])
+  competency_standard CompetencyStandard @relation(fields: [competency_standard_id], references: [id])
+
+  @@unique([tenant_id, learning_objective_id, competency_standard_id], name: "uq_lo_competency_tenant_lo_cs")
+  @@index([tenant_id], name: "idx_lo_competency_mappings_tenant_id")
+  @@index([tenant_id, learning_objective_id], name: "idx_lo_competency_mappings_tenant_lo")
+  @@index([tenant_id, competency_standard_id], name: "idx_lo_competency_mappings_tenant_cs")
+  @@map("lo_competency_mappings")
+}
+
+model Question {
+  id                    String          @id @default(uuid()) @db.Uuid
+  tenant_id             String          @db.Uuid
+  learning_objective_id String          @db.Uuid
+  created_by_id         String          @db.Uuid
+  type                  QuestionType
+  stem                  String
+  difficulty_level      DifficultyLevel
+  bloom_level           BloomLevel
+  is_ai_generated       Boolean         @default(false)
+  review_status         ReviewStatus    @default(PENDING)
+  hints                 Json            @default("[]")
+  created_at            DateTime        @default(now()) @db.Timestamptz
+  updated_at            DateTime        @updatedAt @db.Timestamptz
+  deleted_at            DateTime?       @db.Timestamptz
+
+  // Relations
+  tenant               Tenant               @relation(fields: [tenant_id], references: [id])
+  learning_objective   LearningObjective    @relation(fields: [learning_objective_id], references: [id])
+  created_by           User                 @relation("QuestionCreator", fields: [created_by_id], references: [id])
+  question_options     QuestionOption[]
+  assessment_questions AssessmentQuestion[]
+  attempt_responses    AttemptResponse[]
+
+  @@index([tenant_id], name: "idx_questions_tenant_id")
+  @@index([tenant_id, learning_objective_id], name: "idx_questions_tenant_lo")
+  @@index([tenant_id, type], name: "idx_questions_tenant_type")
+  @@index([tenant_id, difficulty_level], name: "idx_questions_tenant_difficulty")
+  @@index([tenant_id, review_status], name: "idx_questions_tenant_review_status")
+  @@index([tenant_id, bloom_level], name: "idx_questions_tenant_bloom_level")
+  @@index([tenant_id, difficulty_level, review_status], name: "idx_questions_adaptive_pool")
+  @@map("questions")
+}
+
+model QuestionOption {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenant_id   String   @db.Uuid
+  question_id String   @db.Uuid
+  text        String
+  is_correct  Boolean  @default(false)
+  rationale   String?
+  order_index Int
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant                      Tenant                     @relation(fields: [tenant_id], references: [id])
+  question                    Question                   @relation(fields: [question_id], references: [id])
+  attempt_response_selections AttemptResponseSelection[]
+
+  @@index([tenant_id], name: "idx_question_options_tenant_id")
+  @@index([tenant_id, question_id], name: "idx_question_options_tenant_question")
+  @@index([tenant_id, question_id, order_index], name: "idx_question_options_tenant_question_order")
+  @@map("question_options")
+}
+
+model Assessment {
+  id                       String           @id @default(uuid()) @db.Uuid
+  tenant_id                String           @db.Uuid
+  classroom_id             String           @db.Uuid
+  created_by_id            String           @db.Uuid
+  title                    String
+  description              String?
+  type                     AssessmentType
+  status                   AssessmentStatus @default(DRAFT)
+  due_at                   DateTime?        @db.Timestamptz
+  time_limit_minutes       Int?
+  has_randomized_questions Boolean          @default(false)
+  total_marks              Float            @default(0)
+  question_count           Int?
+  mode                     AssessmentMode   @default(FIXED)
+  is_adaptive              Boolean          @default(false)
+  adaptive_config          Json?
+  created_at               DateTime         @default(now()) @db.Timestamptz
+  updated_at               DateTime         @updatedAt @db.Timestamptz
+  deleted_at               DateTime?        @db.Timestamptz
+
+  // Relations
+  tenant               Tenant               @relation(fields: [tenant_id], references: [id])
+  classroom            Classroom            @relation(fields: [classroom_id], references: [id])
+  created_by           User                 @relation("AssessmentCreator", fields: [created_by_id], references: [id])
+  assessment_questions AssessmentQuestion[]
+  assessment_attempts  AssessmentAttempt[]
+
+  @@index([tenant_id], name: "idx_assessments_tenant_id")
+  @@index([tenant_id, classroom_id], name: "idx_assessments_tenant_classroom")
+  @@index([tenant_id, status], name: "idx_assessments_tenant_status")
+  @@index([tenant_id, type], name: "idx_assessments_tenant_type")
+  @@index([tenant_id, classroom_id, status], name: "idx_assessments_tenant_classroom_status")
+  @@map("assessments")
+}
+
+model AssessmentQuestion {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenant_id     String   @db.Uuid
+  assessment_id String   @db.Uuid
+  question_id   String   @db.Uuid
+  order_index   Int
+  marks         Float
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant     Tenant     @relation(fields: [tenant_id], references: [id])
+  assessment Assessment @relation(fields: [assessment_id], references: [id])
+  question   Question   @relation(fields: [question_id], references: [id])
+
+  @@unique([tenant_id, assessment_id, question_id], name: "uq_assessment_questions_tenant_assessment_question")
+  @@index([tenant_id], name: "idx_assessment_questions_tenant_id")
+  @@index([tenant_id, assessment_id], name: "idx_assessment_questions_tenant_assessment")
+  @@index([tenant_id, assessment_id, order_index], name: "idx_assessment_questions_tenant_assessment_order")
+  @@map("assessment_questions")
+}
+
+model AssessmentAttempt {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenant_id     String        @db.Uuid
+  assessment_id String        @db.Uuid
+  student_id    String        @db.Uuid
+  status        AttemptStatus @default(IN_PROGRESS)
+  started_at    DateTime      @default(now()) @db.Timestamptz
+  submitted_at  DateTime?     @db.Timestamptz
+  score          Float?
+  total_marks    Float
+  adaptive_state        Json?
+  selected_question_ids Json?
+  analytics             Json?
+  question_breakdown    Json?
+  created_at     DateTime      @default(now()) @db.Timestamptz
+  updated_at     DateTime      @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant            Tenant            @relation(fields: [tenant_id], references: [id])
+  assessment        Assessment        @relation(fields: [assessment_id], references: [id])
+  student           User              @relation("StudentAttempts", fields: [student_id], references: [id])
+  attempt_responses AttemptResponse[]
+
+  @@index([tenant_id], name: "idx_assessment_attempts_tenant_id")
+  @@index([tenant_id, assessment_id], name: "idx_assessment_attempts_tenant_assessment")
+  @@index([tenant_id, student_id], name: "idx_assessment_attempts_tenant_student")
+  @@index([tenant_id, assessment_id, student_id], name: "idx_assessment_attempts_tenant_assessment_student")
+  @@index([tenant_id, status], name: "idx_assessment_attempts_tenant_status")
+  @@map("assessment_attempts")
+}
+
+// DB-3 FIX: selected_option_ids String[] replaced with AttemptResponse + AttemptResponseSelection junction
+model AttemptResponse {
+  id                     String    @id @default(uuid()) @db.Uuid
+  tenant_id              String    @db.Uuid
+  attempt_id             String    @db.Uuid
+  question_id            String    @db.Uuid
+  text_response          String?
+  is_correct             Boolean?
+  marks_awarded          Float?
+  time_spent_seconds     Int       @default(0)
+  ai_score_suggestion    Float?
+  ai_confidence          Float?
+  teacher_override_score Float?
+  reviewed_by_id         String?   @db.Uuid
+  reviewed_at            DateTime? @db.Timestamptz
+  hint_level_used        Int?
+  served_difficulty      String?
+  sequence_order         Int?
+  created_at             DateTime  @default(now()) @db.Timestamptz
+  updated_at             DateTime  @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant                      Tenant                     @relation(fields: [tenant_id], references: [id])
+  attempt                     AssessmentAttempt          @relation(fields: [attempt_id], references: [id])
+  question                    Question                   @relation(fields: [question_id], references: [id])
+  reviewed_by                 User?                      @relation("ResponseReviewer", fields: [reviewed_by_id], references: [id])
+  attempt_response_selections AttemptResponseSelection[]
+
+  @@unique([tenant_id, attempt_id, question_id], name: "uq_attempt_responses_tenant_attempt_question")
+  @@index([tenant_id], name: "idx_attempt_responses_tenant_id")
+  @@index([tenant_id, attempt_id], name: "idx_attempt_responses_tenant_attempt")
+  @@index([tenant_id, question_id], name: "idx_attempt_responses_tenant_question")
+  @@index([tenant_id, attempt_id, question_id], name: "idx_attempt_responses_tenant_attempt_question")
+  @@map("attempt_responses")
+}
+
+// DB-3 FIX: Junction table for multi-select option selections (1NF compliant)
+model AttemptResponseSelection {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenant_id           String   @db.Uuid
+  attempt_response_id String   @db.Uuid
+  option_id           String   @db.Uuid
+  created_at          DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant          Tenant          @relation(fields: [tenant_id], references: [id])
+  attempt_response AttemptResponse @relation(fields: [attempt_response_id], references: [id])
+  option          QuestionOption  @relation(fields: [option_id], references: [id])
+
+  @@unique([tenant_id, attempt_response_id, option_id], name: "uq_response_selections_tenant_response_option")
+  @@index([tenant_id, attempt_response_id], name: "idx_response_selections_tenant_response")
+  @@map("attempt_response_selections")
+}
+
+model TelemetryEvent {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenant_id   String             @db.Uuid
+  student_id  String             @db.Uuid
+  session_id  String             @db.Uuid
+  event_type  TelemetryEventType
+  payload     Json
+  occurred_at DateTime           @db.Timestamptz
+  created_at  DateTime           @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant  Tenant @relation(fields: [tenant_id], references: [id])
+  student User   @relation(fields: [student_id], references: [id])
+
+  @@index([tenant_id], name: "idx_telemetry_events_tenant_id")
+  @@index([tenant_id, student_id], name: "idx_telemetry_events_tenant_student")
+  @@index([tenant_id, session_id], name: "idx_telemetry_events_tenant_session")
+  @@index([tenant_id, event_type], name: "idx_telemetry_events_tenant_event_type")
+  @@index([tenant_id, occurred_at], name: "idx_telemetry_events_tenant_occurred_at")
+  @@index([tenant_id, student_id, occurred_at], name: "idx_telemetry_events_tenant_student_time")
+  @@map("telemetry_events")
+}
+
+// DB-1 FIX: Added confidence, streak_count, forgetting_index for BKT + spaced repetition
+model KnowledgeState {
+  id                    String    @id @default(uuid()) @db.Uuid
+  tenant_id             String    @db.Uuid
+  student_id            String    @db.Uuid
+  learning_objective_id String    @db.Uuid
+  mastery_score         Float     @default(0)
+  confidence            Float     @default(0.5)
+  streak_count          Int       @default(0)
+  forgetting_index      Float     @default(0)
+  attempt_count         Int       @default(0)
+  last_attempt_at       DateTime? @db.Timestamptz
+  next_review_at        DateTime? @db.Timestamptz
+  created_at            DateTime  @default(now()) @db.Timestamptz
+  updated_at            DateTime  @updatedAt @db.Timestamptz
+
+  // Relations
+  tenant             Tenant            @relation(fields: [tenant_id], references: [id])
+  student            User              @relation(fields: [student_id], references: [id])
+  learning_objective LearningObjective @relation(fields: [learning_objective_id], references: [id])
+
+  @@unique([tenant_id, student_id, learning_objective_id], name: "uq_knowledge_states_tenant_student_lo")
+  @@index([tenant_id], name: "idx_knowledge_states_tenant_id")
+  @@index([tenant_id, student_id], name: "idx_knowledge_states_tenant_student")
+  @@index([tenant_id, learning_objective_id], name: "idx_knowledge_states_tenant_lo")
+  @@index([tenant_id, student_id, mastery_score], name: "idx_knowledge_states_tenant_student_mastery")
+  @@index([tenant_id, next_review_at], name: "idx_knowledge_states_tenant_next_review")
+  @@map("knowledge_states")
+}
+
+// AI Architect: Hint request tracking for progressive hint ladder
+model HintRequest {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tenant_id             String   @db.Uuid
+  student_id            String   @db.Uuid
+  question_id           String   @db.Uuid
+  attempt_id            String   @db.Uuid
+  hint_level            Int
+  hint_text             String
+  created_at            DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tenant  Tenant @relation(fields: [tenant_id], references: [id])
+  student User   @relation(fields: [student_id], references: [id])
+
+  @@index([tenant_id], name: "idx_hint_requests_tenant_id")
+  @@index([tenant_id, student_id], name: "idx_hint_requests_tenant_student")
+  @@index([tenant_id, attempt_id], name: "idx_hint_requests_tenant_attempt")
+  @@map("hint_requests")
+}
+
+// ============================================================
+// AI MODELS
+// ============================================================
+
+model AiUsageLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenant_id     String   @db.Uuid
+  feature       String
+  model_used    String
+  input_tokens  Int
+  output_tokens Int
+  cost_usd      Float
+  user_id       String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+  user   User   @relation(fields: [user_id], references: [id])
+
+  @@index([tenant_id, created_at])
+  @@index([tenant_id, feature])
+  @@map("ai_usage_logs")
+}
+
+model QuestionGenerationJob {
+  id                    String          @id @default(uuid()) @db.Uuid
+  tenant_id             String          @db.Uuid
+  created_by_id         String          @db.Uuid
+  status                String          @default("PENDING")
+  learning_objective_id String          @db.Uuid
+  question_type         QuestionType
+  difficulty_level      DifficultyLevel
+  count                 Int
+  result_question_ids   String[]        @db.Uuid
+  generated_questions   Json?
+  error_message         String?
+  created_at            DateTime        @default(now()) @db.Timestamptz
+  completed_at          DateTime?       @db.Timestamptz
+
+  tenant             Tenant            @relation(fields: [tenant_id], references: [id])
+  created_by         User              @relation(fields: [created_by_id], references: [id])
+  learning_objective LearningObjective @relation(fields: [learning_objective_id], references: [id])
+
+  @@index([tenant_id, status])
+  @@index([created_by_id])
+  @@map("question_generation_jobs")
+}
+
+// ============================================================
+// STUDENT PROGRESS
+// ============================================================
+
+model StudentMilestone {
+  id            String          @id @default(uuid()) @db.Uuid
+  tenant_id     String          @db.Uuid
+  student_id    String          @db.Uuid
+  classroom_id  String          @db.Uuid
+  created_by_id String          @db.Uuid
+  title         String
+  description   String?
+  status        MilestoneStatus @default(NOT_STARTED)
+  due_date      DateTime?       @db.Date
+  completed_at  DateTime?       @db.Timestamptz
+  created_at    DateTime        @default(now()) @db.Timestamptz
+  updated_at    DateTime        @updatedAt @db.Timestamptz
+  deleted_at    DateTime?       @db.Timestamptz
+
+  tenant     Tenant          @relation(fields: [tenant_id], references: [id])
+  student    User            @relation("StudentMilestones", fields: [student_id], references: [id])
+  classroom  Classroom       @relation(fields: [classroom_id], references: [id])
+  created_by User            @relation("MilestoneCreator", fields: [created_by_id], references: [id])
+  tasks      MilestoneTask[]
+
+  @@index([tenant_id, student_id], name: "idx_milestones_tenant_student")
+  @@index([tenant_id, classroom_id], name: "idx_milestones_tenant_classroom")
+  @@index([tenant_id, student_id, status], name: "idx_milestones_tenant_student_status")
+  @@map("student_milestones")
+}
+
+model MilestoneTask {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenant_id       String    @db.Uuid
+  milestone_id    String    @db.Uuid
+  student_id      String    @db.Uuid
+  description     String
+  completion_pct  Int?
+  teacher_comment String?
+  reviewed_by_id  String?   @db.Uuid
+  reviewed_at     DateTime? @db.Timestamptz
+  created_at      DateTime  @default(now()) @db.Timestamptz
+  updated_at      DateTime  @updatedAt @db.Timestamptz
+
+  tenant      Tenant           @relation(fields: [tenant_id], references: [id])
+  milestone   StudentMilestone @relation(fields: [milestone_id], references: [id])
+  student     User             @relation("TaskCreator", fields: [student_id], references: [id])
+  reviewed_by User?            @relation("TaskReviewer", fields: [reviewed_by_id], references: [id])
+
+  @@index([tenant_id, milestone_id], name: "idx_milestone_tasks_tenant_milestone")
+  @@map("milestone_tasks")
+}
+
+model StudentInsightCache {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenant_id       String   @db.Uuid
+  classroom_id    String   @db.Uuid
+  student_id      String   @db.Uuid
+  generated_by_id String   @db.Uuid
+  insight         Json     @db.JsonB
+  generated_at    DateTime @default(now()) @db.Timestamptz
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  tenant       Tenant    @relation(fields: [tenant_id], references: [id])
+  classroom    Classroom @relation(fields: [classroom_id], references: [id])
+  student      User      @relation("InsightStudent", fields: [student_id], references: [id])
+  generated_by User      @relation("InsightGenerator", fields: [generated_by_id], references: [id])
+
+  @@unique([tenant_id, classroom_id, student_id], name: "uq_insight_cache_tenant_classroom_student")
+  @@index([tenant_id, classroom_id, student_id], name: "idx_insight_cache_tenant_classroom_student")
+  @@map("student_insight_cache")
+}
+
+model Invoice {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenant_id   String        @db.Uuid
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("USD")
+  status      InvoiceStatus @default(PENDING)
+  due_date    DateTime      @db.Timestamptz
+  paid_at     DateTime?     @db.Timestamptz
+  description String?
+  created_at  DateTime      @default(now()) @db.Timestamptz
+  updated_at  DateTime      @updatedAt @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@index([tenant_id])
+  @@map("invoices")
+}

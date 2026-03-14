@@ -6,15 +6,15 @@ skills/
 *.md
 
 # ========================
-# NestJS (cerebro/)
+# NestJS (cerebro-backend/)
 # ========================
-cerebro/node_modules/
-cerebro/dist/
-cerebro/.env
-cerebro/.env.*
-cerebro/*.env
-cerebro/coverage/
-cerebro/.nyc_output/
+cerebro-backend/node_modules/
+cerebro-backend/dist/
+cerebro-backend/.env
+cerebro-backend/.env.*
+cerebro-backend/*.env
+cerebro-backend/coverage/
+cerebro-backend/.nyc_output/
 
 # ========================
 # React (cerebro-client/)

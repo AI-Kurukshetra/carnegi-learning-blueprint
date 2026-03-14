@@ -1,0 +1,36 @@
+# Dependencies
+**/node_modules/
+**/.npm
+
+# Build output
+cerebro-backend/dist/
+cerebro-client/dist/
+cerebro-client/build/
+
+# Dev/IDE
+**/.vscode/
+**/.idea/
+**/.DS_Store
+**/Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docs (not needed in image)
+*.md
+!cerebro-backend/prisma/**
+
+# Claude/skills
+.claude/
+skills/
+
+# Coverage/tests
+**/coverage/
+**/.nyc_output/
+
+# Development env files (production ones are explicitly copied)
+cerebro-backend/.env.development
+cerebro-client/.env.development
+cerebro-client/.env.example
+cerebro-backend/.env.example
