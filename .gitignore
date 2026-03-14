@@ -1,0 +1,39 @@
+# ========================
+# Root-level ignores
+# ========================
+.claude/
+skills/
+*.md
+
+# ========================
+# NestJS (cerebro/)
+# ========================
+cerebro/node_modules/
+cerebro/dist/
+cerebro/.env
+cerebro/.env.*
+cerebro/*.env
+cerebro/coverage/
+cerebro/.nyc_output/
+
+# ========================
+# React (cerebro-client/)
+# ========================
+cerebro-client/node_modules/
+cerebro-client/dist/
+cerebro-client/build/
+cerebro-client/.env
+cerebro-client/.env.*
+cerebro-client/*.env
+cerebro-client/coverage/
+
+# ========================
+# General
+# ========================
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
