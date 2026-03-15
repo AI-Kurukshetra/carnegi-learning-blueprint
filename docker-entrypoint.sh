@@ -3,12 +3,19 @@ set -e
 
 echo "=== Cerebro Container Starting ==="
 
-# Run Prisma migrations against the production database
-echo "[..] Running database migrations..."
-cd /app/backend
-npx prisma migrate deploy --schema=./prisma/schema.prisma
-echo "[OK] Migrations applied"
+if [ "$DB_SYNC" = "true" ]; then
+  # Run Prisma migrations against the production database
+  echo "[..] Running database migrations..."
+  npx prisma migrate deploy --schema=./prisma/schema.prisma
+  echo "[OK] Migrations applied"
 
-# Start Nginx + NestJS via supervisor
-echo "[..] Starting services..."
-exec /usr/bin/supervisord -c /etc/supervisord.conf
+  # Seed database (upserts are idempotent; create-only records skip on rerun)
+  echo "[..] Running database seed..."
+  node dist/prisma/seed.js || echo "[WARN] Seed skipped (likely already seeded)"
+else
+  echo "[SKIP] DB_SYNC is not true — skipping migrations and seed"
+fi
+
+# Start NestJS
+echo "[..] Starting NestJS server..."
+exec node dist/src/main.js

@@ -11,7 +11,7 @@ export interface AiRequest {
   temperature?: number;
   tenantId: string;
   userId: string;
-  feature: 'question_generation' | 'hint_generation' | 'grading' | 'student_insight';
+  feature: 'question_generation' | 'hint_generation' | 'grading' | 'student_insight' | 'student_analytics' | 'classroom_analytics';
 }
 
 export interface AiResponse {

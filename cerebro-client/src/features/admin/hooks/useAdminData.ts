@@ -18,6 +18,22 @@ import {
   type UpdateClassroomPayload,
 } from '../services/classrooms.service'
 import {
+  createGrade,
+  deleteGrade,
+  listGrades,
+  updateGrade,
+  type CreateGradePayload,
+  type UpdateGradePayload,
+} from '../services/grades.service'
+import {
+  createSection,
+  deleteSection,
+  listSections,
+  updateSection,
+  type CreateSectionPayload,
+  type UpdateSectionPayload,
+} from '../services/sections.service'
+import {
   createCompetencyStandard,
   deleteCompetencyStandard,
   listCompetencyStandards,
@@ -57,6 +73,8 @@ const QUERY_KEYS = {
   users: 'admin-users',
   schoolProfile: 'admin-school-profile',
   academicYears: 'admin-academic-years',
+  grades: 'admin-grades',
+  sections: 'admin-sections',
   classrooms: 'admin-classrooms',
   subjects: 'admin-subjects',
   competencyStandards: 'admin-competency-standards',
@@ -157,6 +175,76 @@ export function useDeleteAcademicYear() {
   return useMutation({
     mutationFn: (id: string) => deleteAcademicYear(id),
     onSuccess: () => invalidate(queryClient, QUERY_KEYS.academicYears),
+  })
+}
+
+export function useGrades(academicYearId: string | undefined) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.grades, academicYearId],
+    queryFn: () => listGrades(academicYearId!),
+    enabled: !!academicYearId,
+  })
+}
+
+export function useCreateGrade() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ academicYearId, payload }: { academicYearId: string; payload: CreateGradePayload }) =>
+      createGrade(academicYearId, payload),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.grades),
+  })
+}
+
+export function useUpdateGrade() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ academicYearId, id, payload }: { academicYearId: string; id: string; payload: UpdateGradePayload }) =>
+      updateGrade(academicYearId, id, payload),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.grades),
+  })
+}
+
+export function useDeleteGrade() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ academicYearId, id }: { academicYearId: string; id: string }) =>
+      deleteGrade(academicYearId, id),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.grades),
+  })
+}
+
+export function useSections(gradeId: string | undefined) {
+  return useQuery({
+    queryKey: [QUERY_KEYS.sections, gradeId],
+    queryFn: () => listSections(gradeId!),
+    enabled: !!gradeId,
+  })
+}
+
+export function useCreateSection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ gradeId, payload }: { gradeId: string; payload: CreateSectionPayload }) =>
+      createSection(gradeId, payload),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.sections),
+  })
+}
+
+export function useUpdateSection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ gradeId, id, payload }: { gradeId: string; id: string; payload: UpdateSectionPayload }) =>
+      updateSection(gradeId, id, payload),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.sections),
+  })
+}
+
+export function useDeleteSection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ gradeId, id }: { gradeId: string; id: string }) =>
+      deleteSection(gradeId, id),
+    onSuccess: () => invalidate(queryClient, QUERY_KEYS.sections),
   })
 }
 

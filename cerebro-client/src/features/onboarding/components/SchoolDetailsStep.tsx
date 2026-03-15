@@ -13,8 +13,8 @@ const schema = z.object({
   admin_password: z.string().min(8, 'Min 8 characters'),
   school_name: z.string().min(1, 'Required'),
   slug: z.string().min(1, 'Required').regex(/^[a-z0-9-]+$/, 'Only lowercase, numbers and hyphens'),
-  address: z.string().optional().default(''),
-  phone: z.string().optional().default(''),
+  address: z.string(),
+  phone: z.string(),
 })
 
 function toSlug(value: string): string {
@@ -35,7 +35,7 @@ export function SchoolDetailsStep({ defaultValues, onNext }: Props) {
     formState: { errors },
   } = useForm<SchoolFormData>({
     resolver: zodResolver(schema),
-    defaultValues: defaultValues ?? {},
+    defaultValues: { address: '', phone: '', ...defaultValues },
   })
 
   const schoolName = watch('school_name')

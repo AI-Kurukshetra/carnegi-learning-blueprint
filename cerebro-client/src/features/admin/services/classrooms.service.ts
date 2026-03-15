@@ -14,8 +14,8 @@ export interface ListClassroomsParams {
 
 export interface CreateClassroomPayload {
   section_id: string
-  subject_id: string
-  teacher_id: string
+  subject_id?: string
+  teacher_id?: string
   academic_year_id: string
   name: string
   is_active?: boolean

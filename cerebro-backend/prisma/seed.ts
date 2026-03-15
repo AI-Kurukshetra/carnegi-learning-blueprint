@@ -59,7 +59,30 @@ async function main() {
   });
   console.log(`[OK] Super Admin: ${admin.email} (password: Admin@123)`);
 
-  // 4. Sample teacher
+  // 4. School Admin
+  const schoolAdminHash = await bcrypt.hash('SchoolAdmin@123', 10);
+  const schoolAdmin = await prisma.user.upsert({
+    where: {
+      uq_users_tenant_email: {
+        tenant_id: tenant.id,
+        email: 'schooladmin@cerebro.dev',
+      },
+    },
+    update: {},
+    create: {
+      tenant_id: tenant.id,
+      email: 'schooladmin@cerebro.dev',
+      password_hash: schoolAdminHash,
+      role: Role.SCHOOL_ADMIN,
+      first_name: 'School',
+      last_name: 'Admin',
+      is_active: true,
+      is_verified: true,
+    },
+  });
+  console.log(`[OK] School Admin: ${schoolAdmin.email} (password: SchoolAdmin@123)`);
+
+  // 5. Sample teacher
   const teacherHash = await bcrypt.hash('Teacher@123', 10);
   const teacher = await prisma.user.upsert({
     where: {
@@ -258,9 +281,10 @@ async function main() {
 
   console.log('\n=== Seed Complete ===');
   console.log('\nDefault credentials:');
-  console.log('  Admin:   admin@cerebro.dev   / Admin@123');
-  console.log('  Teacher: teacher@cerebro.dev / Teacher@123');
-  console.log('  Student: student@cerebro.dev / Student@123');
+  console.log('  Super Admin:  admin@cerebro.dev        / Admin@123');
+  console.log('  School Admin: schooladmin@cerebro.dev   / SchoolAdmin@123');
+  console.log('  Teacher:      teacher@cerebro.dev       / Teacher@123');
+  console.log('  Student:      student@cerebro.dev       / Student@123');
 }
 
 main()

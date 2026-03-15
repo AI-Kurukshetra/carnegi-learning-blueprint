@@ -142,6 +142,8 @@ model Tenant {
   milestone_tasks          MilestoneTask[]
   invoices                 Invoice[]
   student_insight_cache    StudentInsightCache[]
+  student_analytics_cache  StudentAnalyticsCache[]
+  classroom_analytics_cache ClassroomAnalyticsCache[]
 
   @@map("tenants")
 }
@@ -211,6 +213,9 @@ model User {
   milestone_tasks_reviewed    MilestoneTask[]           @relation("TaskReviewer")
   insight_as_student          StudentInsightCache[]     @relation("InsightStudent")
   insight_generated           StudentInsightCache[]     @relation("InsightGenerator")
+  analytics_as_student           StudentAnalyticsCache[]   @relation("AnalyticsStudent")
+  analytics_generated            StudentAnalyticsCache[]   @relation("AnalyticsGenerator")
+  classroom_analytics_generated  ClassroomAnalyticsCache[] @relation("ClassroomAnalyticsGenerator")
 
   @@unique([tenant_id, email], name: "uq_users_tenant_email")
   @@index([tenant_id], name: "idx_users_tenant_id")
@@ -305,8 +310,8 @@ model Classroom {
   id               String    @id @default(uuid()) @db.Uuid
   tenant_id        String    @db.Uuid
   section_id       String    @db.Uuid
-  subject_id       String    @db.Uuid
-  teacher_id       String    @db.Uuid
+  subject_id       String?   @db.Uuid
+  teacher_id       String?   @db.Uuid
   academic_year_id String    @db.Uuid
   name             String
   is_active        Boolean   @default(true)
@@ -317,12 +322,13 @@ model Classroom {
   // Relations
   tenant        Tenant       @relation(fields: [tenant_id], references: [id])
   section       Section      @relation(fields: [section_id], references: [id])
-  subject       Subject      @relation(fields: [subject_id], references: [id])
-  teacher       User         @relation("TeacherClassrooms", fields: [teacher_id], references: [id])
+  subject       Subject?     @relation(fields: [subject_id], references: [id])
+  teacher       User?        @relation("TeacherClassrooms", fields: [teacher_id], references: [id])
   academic_year AcademicYear @relation(fields: [academic_year_id], references: [id])
-  assessments           Assessment[]
-  student_milestones    StudentMilestone[]
-  student_insight_cache StudentInsightCache[]
+  assessments                Assessment[]
+  student_milestones         StudentMilestone[]
+  student_insight_cache      StudentInsightCache[]
+  classroom_analytics_cache  ClassroomAnalyticsCache[]
 
   @@index([tenant_id], name: "idx_classrooms_tenant_id")
   @@index([tenant_id, teacher_id], name: "idx_classrooms_tenant_teacher")
@@ -838,6 +844,7 @@ model StudentMilestone {
   title         String
   description   String?
   status        MilestoneStatus @default(NOT_STARTED)
+  completion_pct Int            @default(0)
   due_date      DateTime?       @db.Date
   completed_at  DateTime?       @db.Timestamptz
   created_at    DateTime        @default(now()) @db.Timestamptz
@@ -897,6 +904,44 @@ model StudentInsightCache {
   @@unique([tenant_id, classroom_id, student_id], name: "uq_insight_cache_tenant_classroom_student")
   @@index([tenant_id, classroom_id, student_id], name: "idx_insight_cache_tenant_classroom_student")
   @@map("student_insight_cache")
+}
+
+model StudentAnalyticsCache {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenant_id       String   @db.Uuid
+  student_id      String   @db.Uuid
+  generated_by_id String   @db.Uuid
+  analytics       Json     @db.JsonB
+  generated_at    DateTime @default(now()) @db.Timestamptz
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  tenant       Tenant @relation(fields: [tenant_id], references: [id])
+  student      User   @relation("AnalyticsStudent", fields: [student_id], references: [id])
+  generated_by User   @relation("AnalyticsGenerator", fields: [generated_by_id], references: [id])
+
+  @@unique([tenant_id, student_id], name: "uq_analytics_cache_tenant_student")
+  @@index([tenant_id, student_id], name: "idx_analytics_cache_tenant_student")
+  @@map("student_analytics_cache")
+}
+
+model ClassroomAnalyticsCache {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenant_id       String   @db.Uuid
+  classroom_id    String   @db.Uuid
+  generated_by_id String   @db.Uuid
+  analytics       Json     @db.JsonB
+  generated_at    DateTime @default(now()) @db.Timestamptz
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @updatedAt @db.Timestamptz
+
+  tenant       Tenant    @relation(fields: [tenant_id], references: [id])
+  classroom    Classroom @relation(fields: [classroom_id], references: [id])
+  generated_by User      @relation("ClassroomAnalyticsGenerator", fields: [generated_by_id], references: [id])
+
+  @@unique([tenant_id, classroom_id], name: "uq_classroom_analytics_tenant_classroom")
+  @@index([tenant_id, classroom_id], name: "idx_classroom_analytics_tenant_classroom")
+  @@map("classroom_analytics_cache")
 }
 
 model Invoice {

@@ -49,9 +49,9 @@ export interface EnrichedClassroomAcademicYear {
 export interface AdminEnrichedClassroom {
   id: string
   name: string
-  section: EnrichedClassroomSection
-  subject: EnrichedClassroomSubject
-  academic_year: EnrichedClassroomAcademicYear
+  section: EnrichedClassroomSection | null
+  subject: EnrichedClassroomSubject | null
+  academic_year: EnrichedClassroomAcademicYear | null
   student_count?: number
 }
 

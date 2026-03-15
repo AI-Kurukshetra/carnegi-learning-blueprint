@@ -5,9 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MilestoneStatus } from '@prisma/client';
+import { MilestoneStatus, Prisma } from '@prisma/client';
 import { GeminiService } from '../ai/gemini.service';
 import { buildStudentInsightPrompt } from '../ai/prompts/student-insight.prompt';
+import {
+  buildStudentAnalyticsPrompt,
+  type BloomStats,
+  type SubjectQuadrant,
+} from '../ai/prompts/student-analytics.prompt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateMilestoneDto } from './dto/create-milestone.dto';
 import { UpdateMilestoneDto } from './dto/update-milestone.dto';
@@ -430,6 +435,279 @@ export class StudentProgressService {
     });
   }
 
+  // ── Student Analytics ────────────────────────────────────
+
+  async getStudentAnalytics(tenantId: string, studentId: string) {
+    const cached = await this.prisma.studentAnalyticsCache.findUnique({
+      where: {
+        uq_analytics_cache_tenant_student: {
+          tenant_id: tenantId,
+          student_id: studentId,
+        },
+      },
+    });
+
+    return {
+      analytics: cached ? (cached.analytics as any) : null,
+      generated_at: cached?.generated_at ?? null,
+    };
+  }
+
+  async generateStudentAnalytics(
+    tenantId: string,
+    studentId: string,
+    teacherId: string,
+  ) {
+    // 1. Gather all submitted attempts with question_breakdown
+    const attempts = await this.prisma.assessmentAttempt.findMany({
+      where: {
+        tenant_id: tenantId,
+        student_id: studentId,
+        status: { in: ['SUBMITTED', 'GRADED'] },
+        NOT: { question_breakdown: { equals: Prisma.DbNull } },
+      },
+      include: {
+        assessment: {
+          include: {
+            classroom: {
+              include: {
+                subject: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // 2. Gather milestone data
+    const milestones = await this.prisma.studentMilestone.findMany({
+      where: {
+        tenant_id: tenantId,
+        student_id: studentId,
+        deleted_at: null,
+      },
+      select: { status: true, completion_pct: true },
+    });
+
+    const milestonePct =
+      milestones.length > 0
+        ? Math.round(
+            milestones.reduce((s, m) => s + m.completion_pct, 0) /
+              milestones.length,
+          )
+        : 0;
+
+    // 3. Compute bloom taxonomy & subject quadrant data from question_breakdown
+    const bloomAccum: Record<string, { total: number; correct: number }> = {};
+    const subjectAccum: Record<
+      string,
+      {
+        subject_name: string;
+        subject_id: string;
+        total: number;
+        correct: number;
+        bloom: Record<string, { total: number; correct: number }>;
+      }
+    > = {};
+
+    const BLOOM_LEVELS = [
+      'REMEMBER',
+      'UNDERSTAND',
+      'APPLY',
+      'ANALYZE',
+      'EVALUATE',
+      'CREATE',
+    ];
+    for (const bl of BLOOM_LEVELS) {
+      bloomAccum[bl] = { total: 0, correct: 0 };
+    }
+
+    let totalQuestions = 0;
+    let totalCorrect = 0;
+
+    for (const attempt of attempts) {
+      const breakdown = attempt.question_breakdown as any[];
+      if (!Array.isArray(breakdown)) continue;
+
+      const subjectId = attempt.assessment.classroom.subject_id;
+      const subjectName = attempt.assessment.classroom.subject?.name;
+
+      if (!subjectId || !subjectName) continue;
+
+      if (!subjectAccum[subjectId]) {
+        subjectAccum[subjectId] = {
+          subject_name: subjectName,
+          subject_id: subjectId,
+          total: 0,
+          correct: 0,
+          bloom: {},
+        };
+        for (const bl of BLOOM_LEVELS) {
+          subjectAccum[subjectId].bloom[bl] = { total: 0, correct: 0 };
+        }
+      }
+
+      for (const q of breakdown) {
+        const bl = q.bloom_level ?? 'REMEMBER';
+        const isCorrect = q.is_correct === true;
+
+        totalQuestions++;
+        if (isCorrect) totalCorrect++;
+
+        // Global bloom
+        if (bloomAccum[bl]) {
+          bloomAccum[bl].total++;
+          if (isCorrect) bloomAccum[bl].correct++;
+        }
+
+        // Subject-level
+        subjectAccum[subjectId].total++;
+        if (isCorrect) subjectAccum[subjectId].correct++;
+
+        if (subjectAccum[subjectId].bloom[bl]) {
+          subjectAccum[subjectId].bloom[bl].total++;
+          if (isCorrect) subjectAccum[subjectId].bloom[bl].correct++;
+        }
+      }
+    }
+
+    // Build final bloom percentages
+    const bloomTaxonomy: Record<string, BloomStats> = {};
+    for (const [bl, acc] of Object.entries(bloomAccum)) {
+      bloomTaxonomy[bl] = {
+        total: acc.total,
+        correct: acc.correct,
+        percentage: acc.total > 0 ? Math.round((acc.correct / acc.total) * 100) : 0,
+      };
+    }
+
+    // Build subject quadrants
+    const subjectQuadrants: SubjectQuadrant[] = Object.values(subjectAccum).map(
+      (s) => {
+        const bloomBreakdown: Record<string, BloomStats> = {};
+        for (const [bl, acc] of Object.entries(s.bloom)) {
+          bloomBreakdown[bl] = {
+            total: acc.total,
+            correct: acc.correct,
+            percentage:
+              acc.total > 0 ? Math.round((acc.correct / acc.total) * 100) : 0,
+          };
+        }
+        return {
+          subject_name: s.subject_name,
+          subject_id: s.subject_id,
+          total_questions: s.total,
+          correct_answers: s.correct,
+          score_percentage:
+            s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0,
+          bloom_breakdown: bloomBreakdown,
+        };
+      },
+    );
+
+    const overallAccuracy =
+      totalQuestions > 0
+        ? Math.round((totalCorrect / totalQuestions) * 100)
+        : 0;
+
+    // 4. Get student name
+    const student = await this.prisma.user.findFirst({
+      where: { id: studentId, tenant_id: tenantId },
+      select: { first_name: true, last_name: true, email: true },
+    });
+    const studentName = student
+      ? [student.first_name, student.last_name].filter(Boolean).join(' ') ||
+        student.email
+      : 'Student';
+
+    // 5. Build prompt and call AI
+    const promptCtx = {
+      studentName,
+      overallStats: {
+        total_assessments: attempts.length,
+        total_questions_answered: totalQuestions,
+        total_correct: totalCorrect,
+        overall_accuracy: overallAccuracy,
+        milestone_completion_pct: milestonePct,
+      },
+      bloomTaxonomy,
+      subjectQuadrants,
+    };
+
+    const prompt = buildStudentAnalyticsPrompt(promptCtx);
+    const model =
+      this.configService.get<string>('AI_HINT_MODEL') ?? 'gemini-2.5-flash';
+
+    const aiResponse = await this.geminiService.sendMessage({
+      model,
+      systemPrompt: prompt.system,
+      userPrompt: prompt.user,
+      feature: 'student_analytics',
+      tenantId,
+      userId: teacherId,
+      temperature: 0.5,
+      maxTokens: 1024,
+    });
+
+    const aiInsight = this.parseAnalyticsResponse(aiResponse.content);
+
+    // 6. Build final JSONB payload
+    const analyticsPayload = {
+      ...aiInsight,
+      bloom_taxonomy: bloomTaxonomy,
+      subject_quadrants: subjectQuadrants,
+      overall_stats: promptCtx.overallStats,
+    };
+
+    // 7. Upsert cache
+    await this.prisma.studentAnalyticsCache.upsert({
+      where: {
+        uq_analytics_cache_tenant_student: {
+          tenant_id: tenantId,
+          student_id: studentId,
+        },
+      },
+      update: {
+        analytics: analyticsPayload as any,
+        generated_by_id: teacherId,
+        generated_at: new Date(),
+      },
+      create: {
+        tenant_id: tenantId,
+        student_id: studentId,
+        generated_by_id: teacherId,
+        analytics: analyticsPayload as any,
+      },
+    });
+
+    return {
+      analytics: analyticsPayload,
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  private parseAnalyticsResponse(content: string) {
+    try {
+      return JSON.parse(content) as {
+        summary: string;
+        focus_areas: string[];
+        study_recommendations: string[];
+        strengths_narrative: string;
+        growth_narrative: string;
+      };
+    } catch {
+      this.logger.error('Failed to parse AI analytics JSON');
+      return {
+        summary:
+          'Analytics data has been computed. AI narrative is temporarily unavailable.',
+        focus_areas: [],
+        study_recommendations: [],
+        strengths_narrative: '',
+        growth_narrative: '',
+      };
+    }
+  }
+
   // ── Milestone Tasks ───────────────────────────────────────
 
   async createMilestoneTask(
@@ -492,7 +770,7 @@ export class StudentProgressService {
       teacherId,
     );
 
-    return this.prisma.milestoneTask.update({
+    const updatedTask = await this.prisma.milestoneTask.update({
       where: { id: taskId },
       data: {
         completion_pct: dto.completion_pct,
@@ -504,6 +782,38 @@ export class StudentProgressService {
         reviewed_by: { select: { first_name: true, last_name: true } },
       },
     });
+
+    // Recalculate milestone completion percentage from all reviewed tasks
+    const allTasks = await this.prisma.milestoneTask.findMany({
+      where: { milestone_id: task.milestone_id },
+    });
+    const reviewedTasks = allTasks.filter((t) => t.completion_pct !== null);
+    const avgPct =
+      reviewedTasks.length > 0
+        ? Math.round(
+            reviewedTasks.reduce((sum, t) => sum + (t.completion_pct ?? 0), 0) /
+              reviewedTasks.length,
+          )
+        : 0;
+
+    const milestoneStatus: MilestoneStatus =
+      avgPct >= 100
+        ? MilestoneStatus.COMPLETED
+        : avgPct > 0
+          ? MilestoneStatus.IN_PROGRESS
+          : MilestoneStatus.NOT_STARTED;
+
+    await this.prisma.studentMilestone.update({
+      where: { id: task.milestone_id },
+      data: {
+        completion_pct: avgPct,
+        status: milestoneStatus,
+        completed_at:
+          milestoneStatus === MilestoneStatus.COMPLETED ? new Date() : null,
+      },
+    });
+
+    return updatedTask;
   }
 
   // ── Helpers ───────────────────────────────────────────────

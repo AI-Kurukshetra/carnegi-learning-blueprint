@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 
 interface ErrorBody {
@@ -47,6 +48,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return this.resolveHttpException(exception);
     }
 
+    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      return this.resolvePrismaException(exception);
+    }
+
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       errorBody: {
@@ -54,6 +59,45 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message: 'An unexpected error occurred',
       },
     };
+  }
+
+  private resolvePrismaException(
+    exception: Prisma.PrismaClientKnownRequestError,
+  ): { status: number; errorBody: ErrorBody } {
+    switch (exception.code) {
+      case 'P2002':
+        return {
+          status: HttpStatus.CONFLICT,
+          errorBody: {
+            code: 'CONFLICT',
+            message: 'A record with that value already exists',
+          },
+        };
+      case 'P2003':
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          errorBody: {
+            code: 'BAD_REQUEST',
+            message: 'Referenced record does not exist',
+          },
+        };
+      case 'P2025':
+        return {
+          status: HttpStatus.NOT_FOUND,
+          errorBody: {
+            code: 'NOT_FOUND',
+            message: 'Record not found',
+          },
+        };
+      default:
+        return {
+          status: HttpStatus.INTERNAL_SERVER_ERROR,
+          errorBody: {
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'An unexpected error occurred',
+          },
+        };
+    }
   }
 
   private resolveHttpException(exception: HttpException): {

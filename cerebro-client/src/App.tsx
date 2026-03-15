@@ -158,12 +158,12 @@ function App() {
             AI-Powered Assessment Platform
           </div>
           <h1 className="hero-title reveal">
-            Smarter Assessments.<br />
-            <span className="hero-gradient-text">Deeper Understanding.</span>
+            Smarter, Adaptive Learning<br />
+            <span className="hero-gradient-text">Tailored to Every Student.</span>
           </h1>
           <p className="hero-subtitle reveal">
-            Cerebro combines adaptive learning, real-time analytics, and AI-driven insights
-            to help schools deliver personalized education at scale.
+            Cerebro combines AI-adaptive assessments, real-time analytics, and personalized
+            insights to deliver education that adapts to each individual learner.
           </p>
           <div className="hero-ctas reveal">
             <Link to="/signup?plan=free" className="btn-primary btn-lg">

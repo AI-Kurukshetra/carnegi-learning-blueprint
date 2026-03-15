@@ -126,6 +126,11 @@ function MilestoneCard({
             <Badge tone={statusTone(milestone.status)}>
               {milestone.status.replace('_', ' ')}
             </Badge>
+            {milestone.completion_pct > 0 && (
+              <span className={`text-xs font-bold ${milestone.completion_pct >= 80 ? 'text-green-600' : milestone.completion_pct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                {milestone.completion_pct}%
+              </span>
+            )}
           </div>
 
           {milestone.description && (
@@ -211,7 +216,7 @@ export default function MyProgressPage() {
   const milestones = query.data ?? []
   const completed = milestones.filter((m) => m.status === 'COMPLETED').length
   const total = milestones.length
-  const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+  const pct = total > 0 ? Math.round(milestones.reduce((sum, m) => sum + m.completion_pct, 0) / total) : 0
 
   const panelMilestone = milestones.find((m) => m.id === taskPanelMilestoneId) ?? null
 

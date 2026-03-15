@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Pagination } from '@/components/ui/Pagination'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { Select } from '@/components/ui/Select'
-import { SlideOver } from '@/components/ui/SlideOver'
+import { SlidePanel } from '@/components/ui/SlidePanel'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -67,7 +67,12 @@ const DEFAULT_EDIT_FORM: EditFormState = {
 // ── Classroom select options ───────────────────────────────
 
 function buildClassroomLabel(classroom: AdminEnrichedClassroom): string {
-  return `${classroom.name} — ${classroom.subject.name} (${classroom.section.name})`
+  const subject = classroom.subject?.name ?? ''
+  const section = classroom.section?.name ?? ''
+  if (subject && section) return `${classroom.name} — ${subject} (${section})`
+  if (section) return `${classroom.name} (${section})`
+  if (subject) return `${classroom.name} — ${subject}`
+  return classroom.name
 }
 
 interface ClassroomSelectFieldProps {
@@ -305,8 +310,8 @@ export default function UsersPage() {
         )}
       </Card>
 
-      {/* Add User SlideOver */}
-      <SlideOver open={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Add User" side="right">
+      {/* Add User */}
+      <SlidePanel open={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Add User">
         <form className="space-y-4" onSubmit={(e) => void handleCreate(e)}>
           <FormField label="First Name">
             <Input
@@ -355,7 +360,7 @@ export default function UsersPage() {
               isLoading={classroomsQuery.isLoading}
             />
           )}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>
               Cancel
             </Button>
@@ -364,10 +369,10 @@ export default function UsersPage() {
             </Button>
           </div>
         </form>
-      </SlideOver>
+      </SlidePanel>
 
-      {/* Edit User SlideOver */}
-      <SlideOver open={editingUser !== null} onClose={() => setEditingUser(null)} title="Edit User" side="right">
+      {/* Edit User */}
+      <SlidePanel open={editingUser !== null} onClose={() => setEditingUser(null)} title="Edit User">
         <form className="space-y-4" onSubmit={(e) => void handleEdit(e)}>
           <FormField label="First Name">
             <Input
@@ -408,7 +413,7 @@ export default function UsersPage() {
               isLoading={classroomsQuery.isLoading}
             />
           )}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <Button type="button" variant="ghost" onClick={() => setEditingUser(null)}>
               Cancel
             </Button>
@@ -417,7 +422,7 @@ export default function UsersPage() {
             </Button>
           </div>
         </form>
-      </SlideOver>
+      </SlidePanel>
 
       {/* Delete Confirmation Modal */}
       <Modal open={deleteUserTarget !== null} onClose={() => setDeleteUserTarget(null)} title="Delete User">

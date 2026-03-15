@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -26,5 +26,40 @@ export class DashboardController {
   @Roles(Role.SUPER_ADMIN)
   getSuperAdminDashboard() {
     return this.dashboardService.getSuperAdminDashboard();
+  }
+
+  @Get('teacher/classrooms')
+  @Roles(Role.TEACHER, Role.SCHOOL_ADMIN)
+  getTeacherClassroomsWithAnalytics(
+    @TenantId() tenantId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.dashboardService.getTeacherClassroomsWithAnalytics(
+      tenantId,
+      user.id,
+    );
+  }
+
+  @Get('classrooms/:classroom_id/analytics')
+  @Roles(Role.TEACHER, Role.SCHOOL_ADMIN)
+  getClassroomAnalytics(
+    @TenantId() tenantId: string,
+    @Param('classroom_id') classroomId: string,
+  ) {
+    return this.dashboardService.getClassroomAnalytics(tenantId, classroomId);
+  }
+
+  @Post('classrooms/:classroom_id/analytics/generate')
+  @Roles(Role.TEACHER, Role.SCHOOL_ADMIN)
+  generateClassroomAnalytics(
+    @TenantId() tenantId: string,
+    @Param('classroom_id') classroomId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.dashboardService.generateClassroomAnalytics(
+      tenantId,
+      classroomId,
+      user.id,
+    );
   }
 }

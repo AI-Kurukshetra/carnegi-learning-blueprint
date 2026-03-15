@@ -17,11 +17,11 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
-const DEMO_CREDENTIALS: Array<{ label: string; email: string; tenant_slug: string }> = [
-  { label: 'Super Admin', email: 'superadmin@cerebro.dev', tenant_slug: 'cerebro-platform' },
-  { label: 'School Admin', email: 'admin@greenwood-academy.edu', tenant_slug: 'greenwood-academy' },
-  { label: 'Teacher', email: 'priya.sharma@greenwood-academy.edu', tenant_slug: 'greenwood-academy' },
-  { label: 'Student', email: 'aiden.brooks@greenwood-academy.edu', tenant_slug: 'greenwood-academy' },
+const DEMO_CREDENTIALS: Array<{ label: string; email: string; password: string; tenant_slug: string }> = [
+  { label: 'Super Admin', email: 'admin@cerebro.dev', password: 'Admin@123', tenant_slug: 'cerebro-demo' },
+  { label: 'School Admin', email: 'schooladmin@cerebro.dev', password: 'SchoolAdmin@123', tenant_slug: 'cerebro-demo' },
+  { label: 'Teacher', email: 'teacher@cerebro.dev', password: 'Teacher@123', tenant_slug: 'cerebro-demo' },
+  { label: 'Student', email: 'student@cerebro.dev', password: 'Student@123', tenant_slug: 'cerebro-demo' },
 ]
 
 export function LoginForm() {
@@ -39,8 +39,8 @@ export function LoginForm() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      tenant_slug: prefilledSlug || 'greenwood-academy',
-      email: prefilledEmail || 'priya.sharma@greenwood-academy.edu',
+      tenant_slug: prefilledSlug || 'cerebro-demo',
+      email: prefilledEmail || '',
       password: '',
     },
   })
@@ -101,7 +101,7 @@ export function LoginForm() {
               onClick={() => {
                 setValue('tenant_slug', credential.tenant_slug)
                 setValue('email', credential.email)
-                setValue('password', 'Password@123')
+                setValue('password', credential.password)
               }}
             >
               {credential.label}

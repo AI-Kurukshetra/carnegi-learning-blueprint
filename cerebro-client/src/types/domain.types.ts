@@ -70,6 +70,25 @@ export interface CompetencyStandard {
   updated_at: string
 }
 
+export interface Grade {
+  id: string
+  tenant_id: string
+  academic_year_id: string
+  name: string
+  level_number: number
+  created_at: string
+  updated_at: string
+}
+
+export interface Section {
+  id: string
+  tenant_id: string
+  grade_id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Classroom {
   id: string
   tenant_id: string

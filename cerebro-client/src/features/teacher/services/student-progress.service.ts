@@ -33,6 +33,7 @@ export interface Milestone {
   title: string
   description: string | null
   status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
+  completion_pct: number
   due_date: string | null
   completed_at: string | null
   created_at: string
@@ -187,6 +188,23 @@ export async function generateStudentInsight(
 ): Promise<StudentInsightResponse> {
   const response = await apiClient.post<ApiSuccess<StudentInsightResponse>>(
     `/classrooms/${classroomId}/students/${studentId}/ai-insight/generate`,
+  )
+  return response.data.data
+}
+
+// ── Student Analytics ───────────────────────────────────────
+
+export interface StudentAnalyticsResponse {
+  analytics: Record<string, unknown> | null
+  generated_at: string | null
+}
+
+export async function generateStudentAnalytics(
+  classroomId: string,
+  studentId: string,
+): Promise<StudentAnalyticsResponse> {
+  const response = await apiClient.post<ApiSuccess<StudentAnalyticsResponse>>(
+    `/classrooms/${classroomId}/students/${studentId}/analytics/generate`,
   )
   return response.data.data
 }

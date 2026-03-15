@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { existsSync } from 'fs';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -29,6 +32,10 @@ import { StudentProgressModule } from './modules/student-progress/student-progre
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
+const staticDir = join(process.cwd(), 'public');
+const useServeStatic =
+  process.env.NODE_ENV === 'production' && existsSync(staticDir);
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -36,6 +43,14 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
       validationSchema: envValidationSchema,
       envFilePath: ['.env.development', '.env'],
     }),
+    ...(useServeStatic
+      ? [
+          ServeStaticModule.forRoot({
+            rootPath: staticDir,
+            exclude: ['/api/{*path}'],
+          }),
+        ]
+      : []),
     PrismaModule,
     AuthModule,
     TenantsModule,

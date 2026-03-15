@@ -1,21 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateClassroomDto {
-  @IsString()
-  @MinLength(1)
+  @IsUUID()
   section_id: string;
 
-  @IsString()
-  @MinLength(1)
-  subject_id: string;
+  @IsOptional()
+  @IsUUID()
+  subject_id?: string;
 
-  @IsString()
-  @MinLength(1)
-  teacher_id: string;
+  @IsOptional()
+  @IsUUID()
+  teacher_id?: string;
 
-  @IsString()
-  @MinLength(1)
+  @IsUUID()
   academic_year_id: string;
 
   @IsString()

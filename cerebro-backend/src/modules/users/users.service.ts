@@ -274,6 +274,7 @@ export class UsersService {
     });
 
     for (const classroom of classrooms) {
+      if (!classroom.teacher_id) continue;
       const existing = map.get(classroom.teacher_id);
       map.set(
         classroom.teacher_id,

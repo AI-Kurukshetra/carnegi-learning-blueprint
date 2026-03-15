@@ -19,7 +19,7 @@ import {
   type SubmitResponsePayload,
 } from '../services/assessments.service'
 import { getStudentProfile } from '../services/profile.service'
-import { getMyMilestones, createMilestoneTask } from '../services/progress.service'
+import { getMyMilestones, createMilestoneTask, getMyAnalytics } from '../services/progress.service'
 
 const QUERY_KEYS = {
   assessments: 'student-assessments',
@@ -29,6 +29,7 @@ const QUERY_KEYS = {
   attemptResults: 'student-attempt-results',
   profile: 'student-profile',
   myMilestones: 'student-my-milestones',
+  myAnalytics: 'student-my-analytics',
 } as const
 
 function invalidate(queryClient: ReturnType<typeof useQueryClient>, key: string) {
@@ -199,6 +200,14 @@ export function useMyMilestones() {
   return useQuery({
     queryKey: [QUERY_KEYS.myMilestones],
     queryFn: getMyMilestones,
+  })
+}
+
+export function useMyAnalytics() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.myAnalytics],
+    queryFn: getMyAnalytics,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

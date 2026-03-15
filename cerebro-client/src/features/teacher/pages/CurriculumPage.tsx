@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { HelpCircle, Lightbulb, BookOpen, Wrench, Search, Scale, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField } from '@/components/ui/FormField'
@@ -20,6 +21,15 @@ import {
   useDeleteCurriculumTopic,
 } from '../hooks/useTeacherData'
 
+const BLOOM_LEVELS = [
+  { level: 'Remember', description: 'Recall facts or basic concepts', example: 'What is the capital of France?', icon: Lightbulb, color: 'bg-emerald-500' },
+  { level: 'Understand', description: 'Explain ideas or concepts in own words', example: 'Describe why photosynthesis is important.', icon: BookOpen, color: 'bg-sky-500' },
+  { level: 'Apply', description: 'Use knowledge in a new situation', example: 'Calculate the area of this triangle.', icon: Wrench, color: 'bg-brand-primary' },
+  { level: 'Analyze', description: 'Break down information and examine relationships', example: 'Compare and contrast mitosis and meiosis.', icon: Search, color: 'bg-brand-secondary' },
+  { level: 'Evaluate', description: 'Justify a decision or make a judgment', example: 'Which solution is most efficient and why?', icon: Scale, color: 'bg-vivid-orange' },
+  { level: 'Create', description: 'Produce original work or design something new', example: 'Design an experiment to test this hypothesis.', icon: Sparkles, color: 'bg-status-error' },
+]
+
 export default function CurriculumPage() {
   const toast = useToast()
   const subjectsQuery = useCurriculumSubjects()
@@ -29,6 +39,7 @@ export default function CurriculumPage() {
   // Panel states
   const [topicPanelOpen, setTopicPanelOpen] = useState(false)
   const [loPanelOpen, setLoPanelOpen] = useState(false)
+  const [bloomPanelOpen, setBloomPanelOpen] = useState(false)
 
   // Topic form — includes its own subject dropdown
   const [topicForm, setTopicForm] = useState({
@@ -98,8 +109,25 @@ export default function CurriculumPage() {
     <>
       <div className="space-y-4">
       <Card className="p-5">
-        <h2 className="text-xl font-semibold text-text-main">Curriculum</h2>
-        <p className="text-sm text-text-main/70">Manage subjects, topics, and learning objectives.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-text-main">Curriculum</h2>
+            <p className="text-sm text-text-main/70">Manage subjects, topics, and learning objectives.</p>
+            {selectedSubjectId && (
+              <p className="mt-1 text-xs text-text-main/50">
+                {topics.length} topic{topics.length !== 1 ? 's' : ''} in selected subject
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setBloomPanelOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-brand-blue/20 bg-brand-primary/5 px-3 py-1.5 text-xs font-medium text-brand-primary transition-colors hover:bg-brand-primary/10"
+          >
+            <HelpCircle size={14} />
+            What is Bloom&apos;s Taxonomy?
+          </button>
+        </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -376,6 +404,47 @@ export default function CurriculumPage() {
             </Button>
           </div>
         </form>
+      </SlidePanel>
+
+      {/* ── Bloom's Taxonomy Panel ─────────────────────────── */}
+      <SlidePanel
+        open={bloomPanelOpen}
+        onClose={() => setBloomPanelOpen(false)}
+        title="Bloom's Taxonomy"
+      >
+        <p className="mb-4 text-sm text-text-main/70">
+          Bloom&apos;s Taxonomy classifies learning objectives into six levels of cognitive complexity,
+          from basic recall to creative synthesis. Use these levels to align your learning objectives
+          and ensure assessments target the right depth of understanding.
+        </p>
+        <div className="space-y-3">
+          {BLOOM_LEVELS.map((item, i) => (
+            <div
+              key={item.level}
+              className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${item.color} text-white`}>
+                  <item.icon size={16} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-text-main">{item.level}</h4>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-text-main/50">
+                      Level {i + 1}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-text-main/70">{item.description}</p>
+                </div>
+              </div>
+              <div className="mt-2.5 rounded-md bg-slate-50 px-3 py-2">
+                <p className="text-xs italic text-text-main/50">
+                  e.g. &ldquo;{item.example}&rdquo;
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </SlidePanel>
     </>
   )

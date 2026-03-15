@@ -1,6 +1,6 @@
 # ============================================================
 # Cerebro — Single Cloud Run Container
-# Serves React (Nginx) + NestJS (Node) behind Nginx reverse proxy
+# NestJS serves both API + React static files
 # ============================================================
 
 # ---- Stage 1: Build React client ----
@@ -13,10 +13,7 @@ RUN npm ci
 
 COPY cerebro-client/ ./
 
-# Copy production env so Vite bakes VITE_* vars into the build
-COPY cerebro-client/.env.production .env.production
-
-# Override API base URL to use relative path (same origin, proxied by Nginx)
+# Override API base URL to use relative path (same origin)
 RUN echo "VITE_USE_MOCK=false" > .env.production && \
     echo "VITE_MOCK_DELAY_MS=0" >> .env.production && \
     echo "VITE_API_BASE_URL=/api/v1" >> .env.production && \
@@ -44,30 +41,22 @@ RUN npm run build
 # ---- Stage 3: Production image ----
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache nginx supervisor
-
-WORKDIR /app
+WORKDIR /app/backend
 
 # --- Backend ---
-COPY --from=backend-build /app/cerebro-backend/dist ./backend/dist
-COPY --from=backend-build /app/cerebro-backend/node_modules ./backend/node_modules
-COPY --from=backend-build /app/cerebro-backend/package.json ./backend/package.json
-COPY --from=backend-build /app/cerebro-backend/prisma ./backend/prisma
+COPY --from=backend-build /app/cerebro-backend/dist ./dist
+COPY --from=backend-build /app/cerebro-backend/node_modules ./node_modules
+COPY --from=backend-build /app/cerebro-backend/package.json ./package.json
+COPY --from=backend-build /app/cerebro-backend/prisma ./prisma
 
 # Copy production env into the container
-COPY cerebro-backend/.env.production ./backend/.env.production
-COPY cerebro-backend/.env.production ./backend/.env
+COPY cerebro-backend/.env.production ./.env.production
+COPY cerebro-backend/.env.production ./.env
 
-# --- Frontend (static files) ---
-COPY --from=client-build /app/cerebro-client/dist ./frontend
+# --- Frontend (static files served by NestJS serve-static) ---
+COPY --from=client-build /app/cerebro-client/dist ./public
 
-# --- Nginx config ---
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# --- Supervisor config (runs both Nginx + Node) ---
-COPY supervisord.conf /etc/supervisord.conf
-
-# --- Entrypoint script (runs migrations then starts services) ---
+# --- Entrypoint script (runs migrations then starts Node) ---
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 

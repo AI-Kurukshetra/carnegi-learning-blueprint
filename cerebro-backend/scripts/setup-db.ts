@@ -12,32 +12,35 @@ import { Client } from 'pg';
 import { execSync } from 'child_process';
 import * as path from 'path';
 
-// Parse DATABASE_URL from .env.development
-function parseDatabaseUrl(url: string) {
-  const regex =
-    /^postgresql:\/\/(?<user>[^:]+):(?<password>[^@]+)@(?<host>[^:]+):(?<port>\d+)\/(?<database>[^?]+)/;
-  const match = url.match(regex);
-  if (!match?.groups) {
-    throw new Error(`Invalid DATABASE_URL: ${url}`);
-  }
+// Parse individual DB vars from .env.development
+function loadDbConfig() {
+  const fs = require('fs');
+  const envPath = path.resolve(__dirname, '..', '.env.development');
+  const envContent: string = fs.readFileSync(envPath, 'utf-8');
+
+  const getVar = (name: string): string => {
+    const match = envContent.match(new RegExp(`^${name}=(.+)$`, 'm'));
+    if (!match) {
+      throw new Error(`${name} not found in .env.development`);
+    }
+    return match[1].trim();
+  };
+
   return {
-    user: match.groups.user,
-    password: match.groups.password,
-    host: match.groups.host,
-    port: parseInt(match.groups.port, 10),
-    database: match.groups.database,
+    user: getVar('DB_USERNAME'),
+    password: getVar('DB_PASSWORD'),
+    host: getVar('DB_HOST'),
+    port: parseInt(getVar('DB_PORT'), 10),
+    database: getVar('DB_NAME'),
   };
 }
 
-function loadDatabaseUrl(): string {
-  const fs = require('fs');
-  const envPath = path.resolve(__dirname, '..', '.env.development');
-  const envContent = fs.readFileSync(envPath, 'utf-8');
-  const match = envContent.match(/^DATABASE_URL=(.+)$/m);
-  if (!match) {
-    throw new Error('DATABASE_URL not found in .env.development');
+function buildDatabaseUrl(config: { user: string; password: string; host: string; port: number; database: string }): string {
+  // Cloud SQL Unix socket paths start with /cloudsql/
+  if (config.host.startsWith('/cloudsql/')) {
+    return `postgresql://${config.user}:${config.password}@localhost/${config.database}?schema=public&host=${config.host}`;
   }
-  return match[1].trim();
+  return `postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}?schema=public`;
 }
 
 async function databaseExists(
@@ -63,8 +66,8 @@ async function roleExists(
 }
 
 async function main() {
-  const databaseUrl = loadDatabaseUrl();
-  const config = parseDatabaseUrl(databaseUrl);
+  const config = loadDbConfig();
+  const databaseUrl = buildDatabaseUrl(config);
 
   console.log('=== Cerebro Database Setup ===\n');
   console.log(`Target database: ${config.database}`);

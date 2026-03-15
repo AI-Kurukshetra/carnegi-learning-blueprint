@@ -18,8 +18,8 @@ export interface StudentProfileEnrollment {
 export interface StudentProfileClassroom {
   id: string;
   name: string;
-  subject: { id: string; name: string; code: string };
-  teacher: { id: string; first_name: string; last_name: string; email: string };
+  subject: { id: string; name: string; code: string } | null;
+  teacher: { id: string; first_name: string; last_name: string; email: string } | null;
   academic_year: { id: string; name: string };
 }
 
@@ -171,13 +171,17 @@ export class ProfileService {
     return classrooms.map((c) => ({
       id: c.id,
       name: c.name,
-      subject: { id: c.subject.id, name: c.subject.name, code: c.subject.code },
-      teacher: {
-        id: c.teacher.id,
-        first_name: c.teacher.first_name,
-        last_name: c.teacher.last_name,
-        email: c.teacher.email,
-      },
+      subject: c.subject
+        ? { id: c.subject.id, name: c.subject.name, code: c.subject.code }
+        : null,
+      teacher: c.teacher
+        ? {
+            id: c.teacher.id,
+            first_name: c.teacher.first_name,
+            last_name: c.teacher.last_name,
+            email: c.teacher.email,
+          }
+        : null,
       academic_year: { id: c.academic_year.id, name: c.academic_year.name },
     }));
   }

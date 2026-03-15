@@ -50,7 +50,7 @@ export default function TenantDetailPage() {
       key: 'role',
       header: 'Role',
       render: (u) => (
-        <Badge tone={u.role === 'TEACHER' ? 'info' : 'default'}>{u.role}</Badge>
+        <Badge tone={u.role === 'TEACHER' ? 'success' : 'default'}>{u.role}</Badge>
       ),
     },
     {

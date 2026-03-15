@@ -106,7 +106,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--brand-blue), var(--brand-indigo));
-  color: #fff;
+  color: #1228a5;
 }
 
 .nav-wordmark {
@@ -257,7 +257,7 @@
   line-height: 1.08;
   letter-spacing: -0.03em;
   color: var(--text-blue-dark);
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .hero-gradient-text {
@@ -272,7 +272,7 @@
   line-height: 1.65;
   color: var(--text-muted);
   max-width: 600px;
-  margin: 0 auto 36px;
+  margin: 0 auto 32px;
 }
 
 .hero-ctas {

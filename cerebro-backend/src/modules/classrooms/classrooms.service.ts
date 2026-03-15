@@ -13,8 +13,8 @@ export interface ClassroomWithRelations {
   id: string;
   tenant_id: string;
   section_id: string;
-  subject_id: string;
-  teacher_id: string;
+  subject_id: string | null;
+  teacher_id: string | null;
   academic_year_id: string;
   name: string;
   is_active: boolean;
@@ -39,8 +39,8 @@ export interface ClassroomDetail {
   id: string;
   tenant_id: string;
   section_id: string;
-  subject_id: string;
-  teacher_id: string;
+  subject_id: string | null;
+  teacher_id: string | null;
   academic_year_id: string;
   name: string;
   is_active: boolean;
@@ -209,8 +209,8 @@ export class ClassroomsService {
       data: {
         tenant_id: tenantId,
         section_id: dto.section_id,
-        subject_id: dto.subject_id,
-        teacher_id: dto.teacher_id,
+        subject_id: dto.subject_id ?? null,
+        teacher_id: dto.teacher_id ?? null,
         academic_year_id: dto.academic_year_id,
         name: dto.name,
         is_active: dto.is_active ?? true,

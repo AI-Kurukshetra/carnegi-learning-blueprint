@@ -142,6 +142,23 @@ export class StudentProgressController {
     return this.service.listMilestoneTasks(tenantId, milestoneId);
   }
 
+  // ── Teacher: Student Analytics ───────────────────────────
+
+  @Post('classrooms/:classroom_id/students/:student_id/analytics/generate')
+  @Roles(Role.TEACHER, Role.SCHOOL_ADMIN)
+  generateStudentAnalytics(
+    @TenantId() tenantId: string,
+    @Param('classroom_id') _classroomId: string,
+    @Param('student_id') studentId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.service.generateStudentAnalytics(
+      tenantId,
+      studentId,
+      user.id,
+    );
+  }
+
   // ── Student: My Progress ──────────────────────────────────
 
   @Post('student/milestones/:milestone_id/tasks')
@@ -162,5 +179,14 @@ export class StudentProgressController {
     @CurrentUser() user: RequestUser,
   ) {
     return this.service.getMyMilestones(tenantId, user.id);
+  }
+
+  @Get('student/analytics')
+  @Roles(Role.STUDENT)
+  getMyAnalytics(
+    @TenantId() tenantId: string,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.service.getStudentAnalytics(tenantId, user.id);
   }
 }

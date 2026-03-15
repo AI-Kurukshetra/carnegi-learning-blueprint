@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Brain } from 'lucide-react'
-import { Card } from '@/components/ui/Card'
 import { LoadingState } from '@/components/shared/LoadingState'
 import { loadRazorpayScript, openRazorpayCheckout } from '@/lib/razorpay'
 import { createOrder, completeOnboarding, startFreeTrial } from './services/onboarding.service'
@@ -147,15 +146,15 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start py-10 px-4">
-      <Link to="/" className="flex items-center gap-2 mb-8 text-text-main no-underline">
-        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-blue to-brand-indigo flex items-center justify-center">
+    <div className="flex w-full flex-col items-center justify-start px-4 py-6">
+      <Link to="/" className="flex items-center gap-2 mb-6 text-text-main no-underline lg:hidden">
+        <span className="w-9 h-9 rounded-xl bg-brand-primary flex items-center justify-center">
           <Brain size={20} className="text-white" />
         </span>
         <span className="text-lg font-bold tracking-tight">Cerebro</span>
       </Link>
 
-      <Card className="w-full max-w-2xl p-7">
+      <div className="w-full max-w-xl p-6">
         <OnboardingStepper current={step} />
 
         {step === 1 && (
@@ -184,7 +183,7 @@ export default function OnboardingPage() {
             planName={selectedPlan ?? 'free'}
           />
         )}
-      </Card>
+      </div>
 
       <p className="mt-6 text-sm text-text-main/50">
         Already have an account?{' '}

@@ -78,6 +78,7 @@ export default function CompetencyStandardsPage() {
 
   return (
     <>
+    <div className="space-y-4">
       <Card className="space-y-3 p-5">
         <div>
           <h2 className="text-xl font-semibold text-text-main">Competency Standards</h2>
@@ -123,6 +124,7 @@ export default function CompetencyStandardsPage() {
           </>
         )}
       </Card>
+    </div>
 
       <Modal
         open={createOpen || editing !== null}

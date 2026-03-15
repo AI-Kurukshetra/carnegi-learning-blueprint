@@ -149,7 +149,7 @@ export default function ProfilePage() {
   const allEnrollments = activeEnrollments.length > 0 ? activeEnrollments : profile.enrollments
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="space-y-4">
 
       {/* A. Profile Header Card */}
       <Card className="p-6">

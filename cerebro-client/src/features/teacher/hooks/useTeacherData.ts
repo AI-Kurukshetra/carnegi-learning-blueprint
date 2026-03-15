@@ -29,11 +29,16 @@ import {
   listTeacherClassrooms,
   listTopics,
 } from '../services/curriculum.service'
-import { getTeacherDashboard } from '../services/dashboard.service'
+import {
+  getTeacherDashboard,
+  getTeacherClassroomsWithAnalytics,
+  generateClassroomAnalytics,
+} from '../services/dashboard.service'
 import {
   getStudentProgress,
   getStudentInsight,
   generateStudentInsight,
+  generateStudentAnalytics,
   createMilestone,
   updateMilestone,
   deleteMilestone,
@@ -72,6 +77,7 @@ const QUERY_KEYS = {
   curriculumLos: 'teacher-curriculum-los',
   classroomById: 'teacher-classroom-by-id',
   dashboard: 'teacher-dashboard',
+  classroomsAnalytics: 'teacher-classrooms-analytics',
   studentProgress: 'teacher-student-progress',
   studentInsight: 'teacher-student-insight',
 } as const
@@ -333,6 +339,23 @@ export function useTeacherDashboard() {
   })
 }
 
+export function useTeacherClassroomsWithAnalytics() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.classroomsAnalytics],
+    queryFn: () => getTeacherClassroomsWithAnalytics(),
+  })
+}
+
+export function useGenerateClassroomAnalytics() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (classroomId: string) => generateClassroomAnalytics(classroomId),
+    onSuccess: () => {
+      invalidate(queryClient, QUERY_KEYS.classroomsAnalytics)
+    },
+  })
+}
+
 export function useGenerateQuestions() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -472,5 +495,17 @@ export function useReviewMilestoneTask() {
       invalidate(queryClient, QUERY_KEYS.studentProgress)
       invalidate(queryClient, QUERY_KEYS.studentInsight)
     },
+  })
+}
+
+export function useGenerateStudentAnalytics() {
+  return useMutation({
+    mutationFn: ({
+      classroomId,
+      studentId,
+    }: {
+      classroomId: string
+      studentId: string
+    }) => generateStudentAnalytics(classroomId, studentId),
   })
 }

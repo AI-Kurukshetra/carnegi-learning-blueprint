@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Award,
+  BarChart3,
   CheckCircle2,
   Circle,
   ClipboardCheck,
@@ -37,6 +38,7 @@ import {
   useStudentProgress,
   useStudentInsight,
   useGenerateStudentInsight,
+  useGenerateStudentAnalytics,
   useCreateMilestone,
   useUpdateMilestone,
   useDeleteMilestone,
@@ -105,6 +107,7 @@ export default function StudentDetailPage() {
   const query = useStudentProgress(classroomId ?? '', studentId ?? '')
   const insightQuery = useStudentInsight(classroomId ?? '', studentId ?? '')
   const generateMutation = useGenerateStudentInsight()
+  const analyticsMutation = useGenerateStudentAnalytics()
   const createMutation = useCreateMilestone()
   const updateMutation = useUpdateMilestone()
   const deleteMutation = useDeleteMilestone()
@@ -130,8 +133,8 @@ export default function StudentDetailPage() {
   const { student, assessments, milestones } = query.data
   const insight = insightQuery.data?.insight ?? null
   const milestoneCompletionPct =
-    milestones.summary.total > 0
-      ? Math.round((milestones.summary.completed / milestones.summary.total) * 100)
+    milestones.data.length > 0
+      ? Math.round(milestones.data.reduce((sum, m) => sum + m.completion_pct, 0) / milestones.data.length)
       : 0
 
   const assessmentColumns: DataTableColumn<AssessmentSummaryItem>[] = [
@@ -261,6 +264,16 @@ export default function StudentDetailPage() {
       toast.success('AI overview generated.')
     } catch {
       toast.error('Failed to generate AI overview.')
+    }
+  }
+
+  async function handleGenerateAnalytics() {
+    if (!classroomId || !studentId) return
+    try {
+      await analyticsMutation.mutateAsync({ classroomId, studentId })
+      toast.success('Student analytics generated successfully.')
+    } catch {
+      toast.error('Failed to generate analytics.')
     }
   }
 
@@ -409,6 +422,38 @@ export default function StudentDetailPage() {
               </div>
             </Card>
 
+            {/* Generate Analytics CTA */}
+            <Card className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100/80">
+                  <BarChart3 size={18} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-text-main">Student Analytics</h3>
+                  <p className="text-xs text-slate-500">
+                    Generate AI-powered analytics visible on the student&apos;s dashboard
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => void handleGenerateAnalytics()}
+                disabled={analyticsMutation.isPending}
+                className="gap-1.5 text-xs"
+              >
+                {analyticsMutation.isPending ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={13} />
+                    Generate Analytics
+                  </>
+                )}
+              </Button>
+            </Card>
+
             {/* Assessment History */}
             <Card className="p-5">
               <h2 className="mb-3 font-semibold text-text-main">Assessment History</h2>
@@ -491,6 +536,11 @@ export default function StudentDetailPage() {
                                   <Badge tone={statusBadgeTone(m.status)} className="shrink-0 text-[10px]">
                                     {m.status.replace('_', ' ')}
                                   </Badge>
+                                  {m.completion_pct > 0 && (
+                                    <span className={`text-xs font-bold ${m.completion_pct >= 80 ? 'text-green-600' : m.completion_pct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                                      {m.completion_pct}%
+                                    </span>
+                                  )}
                                 </div>
                                 {m.description && (
                                   <p className="mt-1 text-xs leading-relaxed text-slate-500">{m.description}</p>
